@@ -1,0 +1,5 @@
+__pycache__/
+models/
+*.pyc
+.env
+data/raw/
