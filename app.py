@@ -9,10 +9,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
-st.set_page_config(page_title="Movie Recommender", layout="wide")
+st.set_page_config(page_title="🎬 Movie Recommender", layout="wide")
 
-st.title("🎬 Movie Recommender")
-st.markdown("AI-powered movie suggestions with real posters.")
+st.title("🎬 AI Movie Recommender")
+st.markdown("Find movies similar to your favorite ones.")
 
 API_KEY = os.getenv("TMDB_API_KEY")
 
@@ -27,17 +27,22 @@ def load_and_prepare_data():
     movies = movies.merge(credits, on="title")
 
     movies = movies[[
-        "movie_id", "title", "overview",
-        "genres", "keywords", "cast", "crew"
+        "movie_id",
+        "title",
+        "overview",
+        "genres",
+        "keywords",
+        "cast",
+        "crew"
     ]]
 
     movies.dropna(inplace=True)
 
-    # Convert stringified lists back to Python lists
+    # Convert string to list
     for col in ["genres", "keywords", "cast", "crew"]:
         movies[col] = movies[col].apply(ast.literal_eval)
 
-    # Extract names only
+    # Extract names
     def extract_names(obj):
         return [i["name"] for i in obj]
 
@@ -61,13 +66,19 @@ def load_and_prepare_data():
         movies["director"]
     )
 
-    movies = movies[["movie_id", "title", "tags"]]
+    movies = movies[[
+        "movie_id",
+        "title",
+        "overview",
+        "genres",
+        "tags"
+    ]]
 
     return movies
 
 
 # -----------------------------
-# BUILD SIMILARITY
+# BUILD SIMILARITY MATRIX
 # -----------------------------
 @st.cache_data
 def build_similarity(movies):
@@ -101,6 +112,7 @@ def fetch_poster(movie_id):
 def recommend(movie):
     index = movies[movies["title"] == movie].index[0]
     distances = similarity[index]
+
     movie_list = sorted(
         list(enumerate(distances)),
         reverse=True,
@@ -110,20 +122,23 @@ def recommend(movie):
     recommended = []
 
     for i in movie_list:
-        movie_id = movies.iloc[i[0]].movie_id
-        poster = fetch_poster(movie_id)
+        movie_data = movies.iloc[i[0]]
+
+        poster = fetch_poster(movie_data.movie_id)
 
         recommended.append({
-            "title": movies.iloc[i[0]].title,
+            "title": movie_data.title,
             "poster": poster,
-            "score": round(i[1]*100, 2)
+            "score": round(i[1] * 100, 2),
+            "overview": movie_data.overview,
+            "genres": ", ".join(movie_data.genres)
         })
 
     return recommended
 
 
 # -----------------------------
-# UI
+# UI SECTION
 # -----------------------------
 selected_movie = st.selectbox(
     "Search for a movie",
@@ -141,5 +156,12 @@ if st.button("Recommend"):
         with cols[i]:
             if results[i]["poster"]:
                 st.image(results[i]["poster"])
-            st.markdown(f"**{results[i]['title']}**")
+
+            st.markdown(f"### {results[i]['title']}")
             st.markdown(f"⭐ {results[i]['score']}% Match")
+
+            # Genre
+            st.caption(f"🎭 {results[i]['genres']}")
+
+            # Overview
+            st.write(results[i]["overview"][:200] + "...")
