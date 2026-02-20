@@ -38,32 +38,48 @@ def load_and_prepare_data():
 
     movies.dropna(inplace=True)
 
-    # Convert string to list
+    # Convert string to list safely
     for col in ["genres", "keywords", "cast", "crew"]:
-        movies[col] = movies[col].apply(ast.literal_eval)
+        movies[col] = movies[col].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else [])
 
-    # Extract names
-    def extract_names(obj):
-        return [i["name"] for i in obj]
+    # Extract genre names safely
+    def extract_genres(obj):
+        try:
+            return [i["name"] for i in obj]
+        except:
+            return []
 
-    movies["genres"] = movies["genres"].apply(extract_names)
-    movies["keywords"] = movies["keywords"].apply(extract_names)
-    movies["cast"] = movies["cast"].apply(lambda x: extract_names(x)[:3])
+    movies["genres"] = movies["genres"].apply(extract_genres)
 
+    # Extract keyword names
+    movies["keywords"] = movies["keywords"].apply(
+        lambda x: [i["name"] for i in x] if isinstance(x, list) else []
+    )
+
+    # Extract top 3 cast
+    movies["cast"] = movies["cast"].apply(
+        lambda x: [i["name"] for i in x[:3]] if isinstance(x, list) else []
+    )
+
+    # Extract director
     def fetch_director(obj):
-        for i in obj:
-            if i["job"] == "Director":
-                return i["name"]
+        try:
+            for i in obj:
+                if i["job"] == "Director":
+                    return i["name"]
+        except:
+            return ""
         return ""
 
     movies["director"] = movies["crew"].apply(fetch_director)
 
+    # Create tags
     movies["tags"] = (
-        movies["overview"] + " " +
+        movies["overview"].fillna("") + " " +
         movies["genres"].astype(str) + " " +
         movies["keywords"].astype(str) + " " +
         movies["cast"].astype(str) + " " +
-        movies["director"]
+        movies["director"].fillna("")
     )
 
     movies = movies[[
@@ -123,15 +139,14 @@ def recommend(movie):
 
     for i in movie_list:
         movie_data = movies.iloc[i[0]]
-
         poster = fetch_poster(movie_data.movie_id)
 
         recommended.append({
             "title": movie_data.title,
             "poster": poster,
             "score": round(i[1] * 100, 2),
-            "overview": movie_data.overview,
-            "genres": ", ".join(movie_data.genres)
+            "overview": movie_data.overview if pd.notna(movie_data.overview) else "",
+            "genres": ", ".join(movie_data.genres) if isinstance(movie_data.genres, list) else ""
         })
 
     return recommended
@@ -154,6 +169,7 @@ if st.button("Recommend"):
 
     for i in range(len(results)):
         with cols[i]:
+
             if results[i]["poster"]:
                 st.image(results[i]["poster"])
 
@@ -161,7 +177,9 @@ if st.button("Recommend"):
             st.markdown(f"⭐ {results[i]['score']}% Match")
 
             # Genre
-            st.caption(f"🎭 {results[i]['genres']}")
+            if results[i]["genres"]:
+                st.caption(f"🎭 {results[i]['genres']}")
 
             # Overview
-            st.write(results[i]["overview"][:200] + "...")
+            if results[i]["overview"]:
+                st.write(results[i]["overview"][:200] + "...")
