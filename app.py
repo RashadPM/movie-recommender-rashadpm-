@@ -21,8 +21,8 @@ API_KEY = os.getenv("TMDB_API_KEY")
 # -----------------------------
 @st.cache_data
 def load_and_prepare_data():
-    movies = pd.read_csv("data/raw/tmdb_5000_movies.csv")
-    credits = pd.read_csv("data/raw/tmdb_5000_credits.csv")
+    movies = pd.read_csv("dataset/tmdb_5000_movies.csv")
+    credits = pd.read_csv("dataset/tmdb_5000_credits.csv")
 
     movies = movies.merge(credits, on="title")
 
